@@ -1,0 +1,201 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MacOS Launcher</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(180deg, #071021, #0b1220);
+            color: #e6eef6;
+            font-family: Inter, system-ui, Arial;
+        }
+
+        .dock {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 20px;
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(6px);
+        }
+
+        .icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .controls {
+            position: fixed;
+            left: 12px;
+            top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+        }
+
+        .notify {
+            position: fixed;
+            right: 12px;
+            top: 12px;
+            width: 320px;
+            max-height: 60vh;
+            overflow: auto;
+        }
+
+        .notify .item {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="controls">
+        <div class="btn" onclick="openWifi()">Wi-Fi</div>
+        <div class="btn" onclick="toggleBT()">Bluetooth</div>
+        <div class="btn" onclick="openSettings()">Settings</div>
+        <div class="btn" onclick="pickWallpaper()">Set Wallpaper</div>
+    </div>
+
+    <div class="dock" id="dock"></div>
+
+    <div class="notify" id="notify"></div>
+
+    <input type="file" id="wallPicker" accept="image/*" style="display: none">
+
+    <script>
+        // --- Bridge wrapper ---
+        function safe(fnName, ...args) {
+            try {
+                const b = window.AndroidBridge;
+                if (!b || typeof b[fnName] === "undefined") {
+                    console.warn("Bridge not available:", fnName);
+                    return null;
+                }
+                return b[fnName].apply(b, args);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // --- Load installed apps ---
+        function populateApps() {
+            try {
+                const json = (window.AndroidBridge && AndroidBridge.getInstalledApps)
+                    ? AndroidBridge.getInstalledApps()
+                    : "[]";
+
+                const apps = JSON.parse(json);
+                const dock = document.getElementById("dock");
+                dock.innerHTML = "";
+
+                apps.slice(0, 20).forEach(app => {
+                    const el = document.createElement("div");
+                    el.className = "icon";
+
+                    const img = document.createElement("img");
+                    img.style.width = "48px";
+                    img.style.height = "48px";
+                    img.style.borderRadius = "10px";
+                    img.src = app.icon || "";
+
+                    el.appendChild(img);
+                    el.title = app.name;
+                    el.onclick = () => safe("launchApp", app.id);
+
+                    dock.appendChild(el);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // --- Notification mirror ---
+        function pushNotificationFromAndroid(obj) {
+            try {
+                const n = (typeof obj === "string") ? JSON.parse(obj) : obj;
+
+                const wrap = document.getElementById("notify");
+                const item = document.createElement("div");
+                item.className = "item";
+                item.innerHTML = `
+                    <strong>${n.title}</strong>
+                    <div style="opacity: .85">${n.text}</div>
+                `;
+
+                wrap.prepend(item);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // --- Wallpaper picker ---
+        document.getElementById("wallPicker")
+            .addEventListener("change", async function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const buf = await file.arrayBuffer();
+                let binary = "";
+
+                const bytes = new Uint8Array(buf);
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+
+                const b64 = btoa(binary);
+                const data = `data:${file.type};base64,${b64}`;
+
+                safe("setWallpaper", data);
+            });
+
+        function pickWallpaper() {
+            document.getElementById("wallPicker").click();
+        }
+
+        // --- WiFi / Bluetooth / Settings ---
+        function toggleBT() {
+            safe("toggleBluetooth", true);
+            setTimeout(() => safe("toggleBluetooth", false), 2000);
+        }
+
+        function openWifi() {
+            safe("toggleWifi", true);
+        }
+
+        function openSettings() {
+            safe("openAppSettings", "com.example.macoslauncher");
+        }
+
+        // --- Expose to Kotlin ---
+        window.pushNotificationFromAndroid = pushNotificationFromAndroid;
+
+        // Initial load
+        setTimeout(populateApps, 800);
+    </script>
+
+</body>
+</html>
