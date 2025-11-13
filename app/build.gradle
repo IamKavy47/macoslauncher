@@ -6,7 +6,7 @@ plugins {
 android {
     compileSdk 33
     defaultConfig {
-        applicationId "com.example.macoslauncher"
+        applicationId 'com.example.macoslauncher'
         minSdk 21
         targetSdk 33
         versionCode 1
@@ -23,6 +23,6 @@ android {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.21"
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.21'
     implementation 'com.google.code.gson:gson:2.10.1'
 }
