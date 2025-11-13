@@ -21,7 +21,7 @@ jobs:
           java-version: 17
 
       - name: Make gradlew executable
-        run: chmod +x ./gradlew
+        run: chmod +x ./gradle
 
       - name: Build Release APK
         run: ./gradlew assembleRelease
